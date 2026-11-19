@@ -73,11 +73,19 @@ def interpretar_aglomerados(texto):
             invalidos.append(parte.strip())
     return validos, invalidos
 
-        
-# esta funcion devuelve el nombre de un aglomerado (o el código si no se conoce)         
+
 def nombre_aglomerado(codigo):
+    """Devuelve el nombre de un aglomerado a partir de su código.
+
+    Args:
+        codigo: código del aglomerado como texto (los ceros iniciales se
+            ignoran).
+
+    Returns:
+        El nombre, o el mismo código si no figura en config.AGLOMERADOS.
+    """
     return config.AGLOMERADOS.get(codigo.lstrip("0"), codigo)
-              
+
 
 def rango_etario(edad, rangos=None):
     """Devuelve el nombre del rango etario al que pertenece una edad.
@@ -96,8 +104,8 @@ def rango_etario(edad, rangos=None):
             if edad >= minimo and (maximo is None or edad <= maximo):
                 return nombre
     return config.RANGO_SIN_EDAD
- 
- 
+
+
 # esta funcion suma una persona (ponderada y sin ponderar) a un grupo
 # si el grupo no tiene la clave, la crea; si no tiene el estado, lo crea
 
@@ -186,25 +194,33 @@ def sumar_tendencias(lista_conteos):
     return {"aglomerados": suma, "sin_pondera": sin_pondera}
 
 
-def calcular_tasas(estados):
+def calcular_tasas(estados, trimestres=1):
     """Calcula la tasa de desempleo y la distribución de un grupo.
 
     Población económicamente activa (PEA) = ocupados + desocupados.
     Tasa de desempleo = desocupados / PEA * 100.
 
+    Cada trimestre ya representa a toda la población. Si en 'estados' se
+    sumaron varios trimestres, la población queda contada varias veces:
+    para informar niveles (población, PEA, ocupados...) se divide por la
+    cantidad de trimestres, es decir, se promedian. Las tasas y los
+    porcentajes no se ven afectados.
+
     Args:
         estados: diccionario estado -> {ponderado, muestra}.
+        trimestres: cantidad de trimestres que se sumaron en 'estados'.
 
     Returns:
-        Diccionario con la población ponderada de cada estado, la PEA, la
-        tasa de desempleo (None si la PEA es 0), el porcentaje de cada
-        estado sobre la población y los casos de la muestra.
+        Diccionario con la población ponderada de cada estado (promedio
+        por trimestre), la PEA, la tasa de desempleo (None si la PEA es 0),
+        el porcentaje de cada estado sobre la población y los casos de la
+        muestra (esos sí se suman).
     """
     ponderados = {}
     muestra = 0
     for estado in config.ESTADOS_DISTRIBUCION:
         valores = estados.get(estado, {"ponderado": 0, "muestra": 0})
-        ponderados[estado] = valores["ponderado"]
+        ponderados[estado] = round(valores["ponderado"] / trimestres)
         muestra += valores["muestra"]
     poblacion = sum(ponderados.values())
     pea = sum(ponderados[e] for e in config.ESTADOS_ACTIVOS)
@@ -236,27 +252,45 @@ def _orden_claves(grupo, claves):
     return conocidas + sorted(c for c in claves if c not in orden)
 
 
-def _tasas_de_aglomerado(grupos):
-    """Calcula las tasas de cada grupo (total, sexo, rango) de un aglomerado."""
+def _tasas_de_aglomerado(grupos, trimestres=1):
+    """Calcula las tasas de cada grupo de un aglomerado.
+
+    Args:
+        grupos: grupos (total, por sexo, por rango etario) del aglomerado.
+        trimestres: cantidad de trimestres sumados (ver calcular_tasas).
+
+    Returns:
+        Diccionario con las tasas de cada grupo.
+    """
     resultado = {}
     resultado[GRUPO_TOTAL] = calcular_tasas(
-        grupos[GRUPO_TOTAL].get(GRUPO_TOTAL, {}))
+        grupos[GRUPO_TOTAL].get(GRUPO_TOTAL, {}), trimestres)
     for grupo in (GRUPO_SEXO, GRUPO_RANGO):
         resultado[grupo] = {}
         for clave in _orden_claves(grupo, grupos[grupo]):
-            resultado[grupo][clave] = calcular_tasas(grupos[grupo][clave])
+            resultado[grupo][clave] = calcular_tasas(
+                grupos[grupo][clave], trimestres)
     return resultado
 
 
-# esta funcion agrega las tasas de un período a cada aglomerado del informe
-# si falta algún aglomerado, se agrega con su nombre y las tasas del período
-# si se pasa un diccionario extra, se agrega a cada aglomerado del período
-def _agregar_periodo(informe, periodo, conteos, extra=None):
+def _agregar_periodo(informe, periodo, conteos, extra=None, trimestres=1):
+    """Agrega las tasas de un período a cada aglomerado del informe.
+
+    Si un aglomerado todavía no está en el informe, se agrega con su nombre.
+
+    Args:
+        informe: diccionario aglomerado -> {nombre, periodos} a completar.
+        periodo: nombre del período, por ejemplo '2024-S1'.
+        conteos: resultado de contar_tendencias o sumar_tendencias.
+        extra: diccionario que se agrega a cada aglomerado del período.
+        trimestres: cantidad de trimestres sumados en 'conteos'.
+    """
     for codigo, grupos in conteos["aglomerados"].items():
         if codigo not in informe:
             informe[codigo] = {"nombre": nombre_aglomerado(codigo),
                                "periodos": {}}
-        informe[codigo]["periodos"][periodo] = _tasas_de_aglomerado(grupos)
+        informe[codigo]["periodos"][periodo] = _tasas_de_aglomerado(
+            grupos, trimestres)
         if extra:
             informe[codigo]["periodos"][periodo].update(extra)
 
@@ -320,12 +354,17 @@ def armar_informe_periodos(resultados, metadatos=None, semestres=None):
             _agregar_periodo(semestral, anio + "-" + semestre, suma, {
                 "trimestres_incluidos": presentes,
                 "completo": len(presentes) == len(incluidos),
-            })
+            }, len(presentes))
         presentes = sorted(trimestres)
         suma = sumar_tendencias([trimestres[t] for t in presentes])
         _agregar_periodo(anual, anio, suma, {
             "trimestres_incluidos": presentes,
             "completo": len(presentes) == len(config.TRIMESTRES),
-        })
-    return {"metadatos": metadatos or {}, "semestral": semestral,
+        }, len(presentes))
+    nota = ("En semestres y años, la población, la PEA y los totales por "
+            "estado son el PROMEDIO de los trimestres incluidos (cada "
+            "trimestre ya representa a toda la población). Las tasas y los "
+            "porcentajes se calculan sobre las sumas y no cambian.")
+    return {"metadatos": metadatos or {}, "nota_niveles": nota,
+            "semestral": semestral,
             "anual": anual}

@@ -1,6 +1,6 @@
 """Funciones de análisis de calidad de datos (Data Profiling)."""
 from src import config
- 
+
 # Resultados posibles al clasificar un valor.
 RESULTADO_VALIDO = "valido"
 RESULTADO_FALTANTE = "faltante_real"
@@ -11,15 +11,15 @@ RESULTADO_NO_CORRESPONDE = "no_corresponde"
 # como valido, faltante o no corresponde
 def clasificar_valor(valor, columna):
     """Clasifica un valor leído del archivo según las reglas de config.py.
- 
+
     Primero se consulta NO_CORRESPONDE, porque tiene prioridad: en algunas
     columnas el vacío significa "no corresponde" y no "faltante".
- 
+
     Args:
         valor: texto leído del archivo (puede ser None si la fila estaba
             incompleta).
         columna: nombre de la columna a la que pertenece el valor.
- 
+
     Returns:
         RESULTADO_NO_CORRESPONDE si la pregunta no aplica,
         RESULTADO_FALTANTE si es un faltante real, o
@@ -34,20 +34,22 @@ def clasificar_valor(valor, columna):
     return RESULTADO_VALIDO
 
 # recibe una lista de filas y un conjunto de columnas
-# y devuelve un diccionario con la cantidad de valores válidos, 
+# y devuelve un diccionario con la cantidad de valores válidos,
 # faltantes reales y no corresponde por columna,
 # así como la cantidad de filas y las columnas inexistentes.
+
+
 def contar_valores(filas, columnas):
     """Cuenta, por columna, los valores válidos, faltantes y no corresponde.
- 
+
     Solo cuenta: no calcula porcentajes ni aplica umbrales. Así el conteo se
     hace una sola vez y se puede reutilizar con distintos umbrales o sumar
     con el de otros trimestres.
- 
+
     Args:
         filas: lista de diccionarios (ver data_loader.leer_filas).
         columnas: nombres de las columnas a analizar.
- 
+
     Returns:
         Diccionario con total_filas, columnas (por columna: validos,
         faltantes_reales y no_corresponde) e inexistentes (columnas pedidas
@@ -85,17 +87,18 @@ def contar_valores(filas, columnas):
 # una columna que falte en alguno de los períodos se informa como inexistente
 # y se excluye de la suma, para que los totales sean coherentes
 
+
 def sumar_conteos(lista_conteos):
     """Suma los conteos de varios períodos (por ejemplo, 4 trimestres).
- 
+
     Se suman los conteos y no los porcentajes: promediar porcentajes da un
     resultado distinto cuando los trimestres tienen distinta cantidad de
     filas. Una columna que falte en alguno de los períodos se informa como
     inexistente y se excluye de la suma, para que los totales sean coherentes.
- 
+
     Args:
         lista_conteos: lista de resultados de contar_valores.
- 
+
     Returns:
         Un diccionario con el mismo formato que contar_valores.
     """
@@ -125,16 +128,16 @@ def sumar_conteos(lista_conteos):
 
 def completitud_con_umbral(conteos, umbral=None):
     """Calcula porcentajes y aplica un umbral de faltantes a unos conteos.
- 
+
     Los porcentajes se calculan sobre el total de filas. Una columna supera
     el umbral si su porcentaje de faltantes reales es MAYOR (no igual) al
     umbral.
- 
+
     Args:
         conteos: resultado de contar_valores o de sumar_conteos.
         umbral: porcentaje de faltantes (por defecto
             config.UMBRAL_FALTANTES_PCT).
- 
+
     Returns:
         Diccionario con total_filas, umbral_pct, columnas (conteos,
         porcentajes y si supera el umbral), sobre_umbral (lista de columnas
@@ -187,32 +190,32 @@ def completitud_con_umbral(conteos, umbral=None):
 # así como el porcentaje de faltantes y si supera el umbral.
 def contar_completitud(filas, columnas, umbral=None):
     """Cuenta y aplica el umbral en un solo paso (para un único período).
- 
+
     Es contar_valores seguido de completitud_con_umbral.
- 
+
     Args:
         filas: lista de diccionarios (ver data_loader.leer_filas).
         columnas: nombres de las columnas a analizar.
         umbral: porcentaje de faltantes (por defecto
             config.UMBRAL_FALTANTES_PCT).
- 
+
     Returns:
         Lo mismo que completitud_con_umbral.
     """
     return completitud_con_umbral(contar_valores(filas, columnas), umbral)
- 
 
-# esta funcion arma un informe de completitud por trimestre y por año 
+
+# esta funcion arma un informe de completitud por trimestre y por año
 def armar_informe_completitud(resultados, umbral, metadatos=None):
     """Arma el informe de completitud para un umbral, por trimestre y por año.
- 
+
     Args:
         resultados: lista de diccionarios con las claves anio, trimestre y
             conteos (resultado de contar_valores), uno por archivo.
         umbral: porcentaje de faltantes a aplicar.
         metadatos: diccionario con datos del análisis (categoría, tipo de
             archivo, años) que se copia tal cual al informe.
- 
+
     Returns:
         Diccionario con metadatos, umbral_pct, por_trimestre (un bloque por
         cada 'año-trimestre'), anual (un bloque por año, calculado sumando
@@ -293,14 +296,15 @@ def a_numero(valor):
         return None
     try:
         numero = float(texto)
-    except ValueError:
+        if numero == int(numero):
+            return int(numero)
+    except (ValueError, OverflowError):
+        # No es un número, o es 'nan' / 'inf' (que no se pueden convertir).
         return None
-    if numero == int(numero):
-        return int(numero)
     return numero
 
 
-# esta funcion indica si un valor está dentro de un rango, con opción de incluir o no los extremos
+# indica si un valor está dentro de un rango (extremos opcionales)
 def en_rango(valor, minimo, maximo, incluidos=None):
     """Indica si un valor está dentro de un rango.
 
@@ -361,7 +365,8 @@ def armar_ejemplo(fila, columnas):
 # =============================================================================
 # Cada regla recibe una fila y devuelve True si encuentra la inconsistencia.
 # Los valores de corte salen de config.py: para cambiar una edad o un código
-# no habría que tocar las funciones estas 
+# no habría que tocar las funciones estas
+
 
 def _edad_invalida(fila):
     """CRÍTICO: la edad está vacía o no es un número."""
@@ -445,7 +450,7 @@ def _ocupado_sin_ingreso(fila):
 
 
 def _universitario_menor(fila):
-    """Mod. 5.1: nivel universitario con edad menor a EDAD_MIN_UNIVERSITARIO."""
+    """Mod. 5.1: nivel universitario con edad menor al mínimo."""
     edad = _edad(fila)
     return (_valor(fila, config.COL_NIVEL_ED) in config.NIVEL_ED_UNIVERSITARIO
             and edad is not None and edad < config.EDAD_MIN_UNIVERSITARIO)
@@ -574,7 +579,6 @@ REGLAS_A3 = [
            (config.COL_ESTADO, config.COL_INGRESO_TOTAL),
            _desocupado_con_ingreso_total),
 ]
-
 
 
 # =============================================================================
@@ -726,6 +730,8 @@ def armar_informe_consistencia(resultados, metadatos=None):
 
 # esta funcion ordena las reglas por gravedad según config.ORDEN_ETIQUETAS
 # y devuelve un bloque con las reglas ordenadas
+
+
 def _ordenar_bloque(hallazgos):
     """Copia un resultado de evaluar_reglas con las reglas por gravedad."""
     ordenadas = {}

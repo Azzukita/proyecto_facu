@@ -1,5 +1,5 @@
 """Configuración central.
- 
+
 Acá viven los datos y criterios del proyecto que pueden cambiar: rutas,
 parámetros de lectura de archivos, definición de valores faltantes,
 umbrales y listas de variables a analizar. La lógica del análisis no va
@@ -7,24 +7,14 @@ en este archivo: si cambia un criterio, se modifica acá y las funciones
 no se tocan.
 """
 from src import rutas
-from pathlib import Path
 
 # =============================================================================
 # RUTAS
 # =============================================================================
-RAIZ_PROYECTO = Path(__file__).resolve().parent.parent
-
-def obtener_ruta_del_dataset(data,carpeta,dataset):
-
-    """
-    es una funcion que devuelve la ruta del dataset
-    """
-
-    ruta_completa = RAIZ_PROYECTO / data / carpeta  / dataset 
-    return str(ruta_completa)
-
-
 # Carpeta raíz donde viven las categorías (files/mercado_laboral, etc.).
+# Modificación 1: la carpeta "files" está FUERA del proyecto, al lado de la
+# carpeta raíz. Para cambiar la ubicación de los datos solo hay que modificar
+# la línea siguiente.
 DIR_DATOS = rutas.RAIZ_PROYECTO.parent / "files"
 # Carpeta donde se guardan los informes generados.
 DIR_SALIDA = rutas.RAIZ_PROYECTO / "output"
@@ -40,6 +30,9 @@ ARCHIVO_CALIDAD = "calidad_datos_umbral_{umbral}.json"
 SEPARADOR = ";"
 # Se indica el encoding de forma explícita.
 ENCODING = "utf-8"
+# Codificaciones que se prueban, en orden, si el archivo no se puede leer
+# con ENCODING (ver data_loader.leer_filas).
+ENCODINGS_ALTERNATIVOS = ("latin-1",)
 
 # =============================================================================
 # DETECCIÓN AUTOMÁTICA DE ARCHIVOS
@@ -75,7 +68,7 @@ CAT_CIENCIA_TECNOLOGIA = "ciencia_y_tecnologia"
 #
 # ORDEN DE CONSULTA: NO_CORRESPONDE tiene prioridad sobre VALOR_VACIO. Hay
 # columnas donde el vacío significa "no corresponde" (ver PP04D_COD).
- 
+
 # Un campo vacío es faltante real en CUALQUIER columna, salvo que la columna
 # figure en NO_CORRESPONDE con el vacío como código.
 VALOR_VACIO = ""
@@ -249,7 +242,7 @@ ETIQUETAS_INCONSISTENCIA = (
     ETIQUETA_ERROR,
     ETIQUETA_VERIFICAR,
 )
- 
+
 # --- Columnas --------------------------------------------------------------
 COL_PONDERA = "PONDERA"
 COL_AGLOMERADO = "AGLOMERADO"
@@ -258,12 +251,12 @@ COL_NIVEL_ED = "NIVEL_ED"
 COL_INGRESO_TOTAL = "P47T"       # ingreso total individual
 COL_INGRESO_OTRAS = "TOT_P12"    # ingreso de otras ocupaciones
 COL_ITF = "ITF"                  # ingreso total familiar
- 
+
 # --- Sexo (CH04) -----------------------------------------------------------
 SEXO_VARON = "1"
 SEXO_MUJER = "2"
 NOMBRES_SEXO = {SEXO_VARON: "Varón", SEXO_MUJER: "Mujer"}
- 
+
 # --- Modificación 5: nuevas reglas de A.3 ----------------------------------
 # NIVEL_ED: 5 = superior universitario incompleto, 6 = completo.
 NIVEL_ED_UNIVERSITARIO = ("5", "6")
@@ -276,7 +269,7 @@ EDAD_MIN_JUBILACION_POR_SEXO = {SEXO_VARON: 65, SEXO_MUJER: 60}
 EDAD_OUTLIER = 100
 # El trabajador familiar sin remuneración puede legítimamente no cobrar.
 CAT_OCUP_TRABAJADOR_FAMILIAR = "4"
- 
+
 # --- Modificación 5.4: roles -----------------------------------------------
 # Cada rol define las columnas de las que quiere saber si tienen
 # inconsistencias.
@@ -287,7 +280,7 @@ ROLES = {
     "analista": ["ESTADO", "CAT_OCUP", "ITF", "CH06", "NIVEL_ED"],
 }
 ARCHIVO_ROLES = "calidad_datos_roles.json"
- 
+
 # --- Parte B (B.1) ---------------------------------------------------------
 # Población sobre la que se calcula la distribución: ocupados, desocupados e
 # inactivos. Quedan afuera ESTADO = 0 (sin entrevista) y ESTADO = 4 (menores
@@ -353,3 +346,58 @@ AGLOMERADOS = {
     "91": "Rawson-Trelew",
     "93": "Viedma-Carmen de Patagones",
 }
+
+# =============================================================================
+# PARTE C: TECNOLOGÍA (CIENCIA Y TECNOLOGÍA)
+# =============================================================================
+# Variables del módulo TIC (diseño de registro del módulo de tecnología).
+COL_POND_TIC = "POND_TIC"         # factor de expansión del módulo TIC
+COL_TIC_COMPUTADORA = "IH_II_01"  # hogares: el hogar tiene computadora
+COL_TIC_INTERNET = "IH_II_02"     # hogares: el hogar tiene acceso a internet
+COL_TIC_CELULAR = "IP_III_06"     # individuos: la persona usó celular
+TIC_SI = "1"
+TIC_NO = "2"
+# Tupla que identifica a un hogar de forma única en ambos archivos.
+COLS_ID_HOGAR = ("CODUSU", "NRO_HOGAR", "AGLOMERADO")
+# Cantidad mínima de años consecutivos que pide el enunciado.
+MIN_ANIOS_TIC = 3
+
+# El archivo TIC no trae la columna REGION: se obtiene del aglomerado.
+# Correspondencia verificada con los archivos de Mercado Laboral (cada
+# aglomerado pertenece a una sola región).
+NOMBRES_REGIONES = {
+    "1": "Gran Buenos Aires",
+    "40": "Noroeste",
+    "41": "Noreste",
+    "42": "Cuyo",
+    "43": "Pampeana",
+    "44": "Patagonia",
+}
+REGION_DE_AGLOMERADO = {
+    "32": "1", "33": "1",
+    "18": "40", "19": "40", "22": "40", "23": "40", "25": "40", "29": "40",
+    "7": "41", "8": "41", "12": "41", "15": "41",
+    "10": "42", "26": "42", "27": "42",
+    "2": "43", "3": "43", "4": "43", "5": "43", "6": "43", "13": "43",
+    "14": "43", "30": "43", "34": "43", "36": "43", "38": "43",
+    "9": "44", "17": "44", "20": "44", "31": "44", "91": "44", "93": "44",
+}
+
+# Informe de tecnología (Modificación 7).
+ARCHIVO_TECNOLOGIA = "tecnologia_informe.json"
+# Qué hacer si el archivo de salida ya existe:
+#   "preguntar": pregunta al usuario si lo quiere sobrescribir (Opción A).
+#   "timestamp": guarda un archivo nuevo con fecha y hora (Opción B).
+MODO_ARCHIVO_EXISTENTE = "timestamp"
+
+# Definiciones que se copian al informe para que se entienda cómo se calculó.
+NOTAS_TECNOLOGIA = [
+    "Computadora: IH_II_01 = 1. Internet: IH_II_02 = 1.",
+    "Celular: el archivo de hogares no lo tiene; un hogar se considera con "
+    "celular si al menos una persona del hogar usó celular (IP_III_06 = 1). "
+    "Se une individuos con hogares por (CODUSU, NRO_HOGAR, AGLOMERADO).",
+    "Los hogares sin dato (código 9 u otro valor distinto de 1 y 2) se "
+    "excluyen del denominador de cada indicador.",
+    "Ponderación: POND_TIC, el factor de expansión del módulo TIC.",
+    "Región: se obtiene del aglomerado (el archivo TIC no trae REGION).",
+]
