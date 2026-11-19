@@ -247,6 +247,8 @@ ETIQUETAS_INCONSISTENCIA = (
 COL_PONDERA = "PONDERA"
 COL_AGLOMERADO = "AGLOMERADO"
 COL_SEXO = "CH04"
+# Bloque B: cantidad mínima de años que debe abarcar el rango elegido.
+MIN_ANIOS_B = 2
 COL_NIVEL_ED = "NIVEL_ED"
 COL_INGRESO_TOTAL = "P47T"       # ingreso total individual
 COL_INGRESO_OTRAS = "TOT_P12"    # ingreso de otras ocupaciones
@@ -401,3 +403,76 @@ NOTAS_TECNOLOGIA = [
     "Ponderación: POND_TIC, el factor de expansión del módulo TIC.",
     "Región: se obtiene del aglomerado (el archivo TIC no trae REGION).",
 ]
+
+# =============================================================================
+# BLOQUE C (SEGUNDA ETAPA): CRUCE DE HOGARES, CALIDAD TECNOLÓGICA Y VIVIENDA
+# =============================================================================
+# El módulo TIC (ciencia y tecnología) solo se relevó en el 4.º trimestre, así
+# que para cruzarlo con la vivienda se usa el archivo de hogares de Mercado
+# Laboral de ESE trimestre.
+TRIMESTRE_CRUCE_TIC = "T4"
+
+# Pesos disponibles para ponderar el cruce. El primero es el de por defecto:
+# POND_TIC expande la muestra del módulo TIC; PONDERA es el de la EPH general.
+COLS_PESO_CRUCE = (COL_POND_TIC, COL_PONDERA)
+
+# Calidad tecnológica: 4 categorías a partir de (¿tiene computadora?,
+# ¿tiene internet?). Para cambiar los nombres o juntar categorías se edita
+# SOLO este diccionario (el orden es el orden en que se muestran).
+CATEGORIAS_CALIDAD_TEC = {
+    (True, True): "Computadora e internet",
+    (True, False): "Solo computadora",
+    (False, True): "Solo internet",
+    (False, False): "Sin computadora ni internet",
+}
+
+# Variables de vivienda (archivo de hogares de Mercado Laboral).
+VARIABLES_VIVIENDA = {
+    "IV1": "Tipo de vivienda",
+    "II7": "Condición de propiedad",
+    "IV3": "Material de los pisos",
+    "IV4": "Material del techo",
+}
+VARIABLE_VIVIENDA_DEFECTO = "IV1"
+
+# Código -> nombre (diseño de registro EPH, hogares). Verificar contra el
+# diseño de registro. Un código que no figure acá se muestra como "Código X".
+ETIQUETAS_VIVIENDA = {
+    "IV1": {
+        "1": "Casa", "2": "Departamento", "3": "Pieza en inquilinato",
+        "4": "Pieza en hotel o pensión",
+        "5": "Local no construido para habitación", "6": "Otros",
+    },
+    "II7": {
+        "1": "Propietario de vivienda y terreno",
+        "2": "Propietario solo de la vivienda",
+        "3": "Inquilino",
+        "4": "Ocupante por pago de impuestos o expensas",
+        "5": "Ocupante en relación de dependencia",
+        "6": "Ocupante gratuito (con permiso)",
+        "7": "Ocupante de hecho (sin permiso)",
+        "8": "En sucesión", "9": "Otra situación",
+    },
+    "IV3": {
+        "1": "Mosaico, baldosa, madera o cerámica",
+        "2": "Cemento o ladrillo fijo",
+        "3": "Ladrillo suelto o tierra", "4": "Otros",
+    },
+    "IV4": {
+        "1": "Membrana o cubierta asfáltica", "2": "Baldosa o losa sin cubierta",
+        "3": "Pizarra o teja", "4": "Chapa de metal sin cubierta",
+        "5": "Chapa de fibrocemento o plástico", "6": "Chapa de cartón",
+        "7": "Caña, tabla, paja con barro o paja sola",
+        "9": "Sin cubierta",
+    },
+}
+ETIQUETA_SIN_DATO_VIVIENDA = "Sin dato"
+
+# Grupos con menos hogares de muestra que esto se avisan como poco confiables.
+MIN_MUESTRA_GRUPO = 30
+# Nombre de la opción "sin filtro" del selector de región.
+OPCION_TODAS_REGIONES = "Todas las regiones"
+# Cantidad de aglomerados que se preseleccionan en la tabla de penetración.
+N_AGLOMERADOS_DEFECTO = 5
+# Informes de tecnología (Primera Parte): nombre base, sin timestamp.
+PATRON_INFORME_TECNOLOGIA = "tecnologia_informe*.json"
