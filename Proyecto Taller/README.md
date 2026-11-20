@@ -1,93 +1,137 @@
-# grupo02
+# PyEPH.AR
 
+Aplicación de análisis y visualización de la Encuesta Permanente de Hogares
+(EPH) del INDEC, desarrollada para el Taller de Lenguajes (Redictado 2026).
 
+## Integrantes
 
-## Getting started
+1. Lucas Pascual Martina
+2. Felipe Marín Russo
+3. Lautaro Agustín López
+4. Gonzalo Ariel Escribano Echever
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Descripción
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+El proyecto procesa los microdatos de la EPH de dos categorías:
 
-## Add your files
+- **Mercado Laboral** (archivos de hogares e individuos, por trimestre).
+- **Ciencia y Tecnología** (módulo de tecnologías de la información y la
+  comunicación, por año).
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+Qué hace hoy (primera etapa, solo con el módulo `csv` de Python):
+
+| Parte | Qué calcula | Dónde |
+|---|---|---|
+| A.1 | Completitud (valores faltantes) de hogares e individuos, con umbrales de 5%, 10% y 20% | `notebooks/hogares_mercado_laboral.ipynb`, `notebooks/individuos_mercado_laboral.ipynb` |
+| A.2 y A.3 | Inconsistencias con las etiquetas CRÍTICO, ERROR, VERIFICAR, ADVERTENCIA e INFO, e informes por rol (docente, investigador, analista) | `notebooks/individuos_mercado_laboral.ipynb` |
+| B.1 | Tasa de desempleo y distribución de la población por aglomerado, por sexo y rango etario, por trimestre, semestre y año | `notebooks/individuos_mercado_laboral.ipynb` |
+| C | Consistencia de archivos y porcentaje de hogares con celular, internet y computadora por región y aglomerado | `notebooks/ciencia_tecnologia.ipynb` |
+
+Los informes se guardan como JSON en `output/`.
+
+## Requisitos
+
+- Python 3.9 o superior (probado con 3.12).
+- Funciona en Windows, Linux y macOS.
+
+## Instalación
+
+```bash
+# 1. Crear y activar un entorno virtual
+python -m venv .venv
+# Windows:      .venv\Scripts\activate
+# Linux/macOS:  source .venv/bin/activate
+
+# 2. Instalar las librerías
+pip install -r requirements.txt
+```
+
+## Dónde van los datos
+
+Los archivos de la EPH **no están dentro del proyecto**. Van en una carpeta
+llamada `files`, que debe estar **al lado** de la carpeta del proyecto:
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.catedras.linti.unlp.edu.ar/redictado_2026/grupo02.git
-git branch -M main
-git push -uf origin main
+mi_carpeta/
+├── files/                          <- datos (se descargan del INDEC)
+│   ├── mercado_laboral/            <- hogares e individuos, tal como se descomprimen
+│   └── ciencia_y_tecnologia/       <- hogares e individuos de tecnología
+└── proyecto_taller/                <- este repositorio
 ```
 
-## Integrate with your tools
+- Los archivos se dejan **como se descomprimen**: no hace falta ordenarlos por
+  año. El programa detecta solo la categoría (por la carpeta) y el tipo, el año
+  y el trimestre (por el nombre, por ejemplo `usu_hogar_T124.txt`).
+- **Agregar un año:** copiar sus archivos en la carpeta de la categoría. No se
+  modifica el código.
+- **Agregar una categoría:** crear una carpeta nueva dentro de `files/`.
+- Para cambiar la ubicación de los datos se modifica una sola línea:
+  `DIR_DATOS` en `src/config.py`.
 
-* [Set up project integrations](https://gitlab.catedras.linti.unlp.edu.ar/redictado_2026/grupo02/-/settings/integrations)
+Descarga: https://www.indec.gob.ar/indec/web/Institucional-Indec-BasesDeDatos-1
 
-## Collaborate with your team
+## Cómo ejecutarlo
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+Desde la carpeta del proyecto:
 
-## Test and Deploy
+```bash
+jupyter notebook
+```
 
-Use the built-in continuous integration in GitLab.
+Abrir y ejecutar todas las celdas (en este orden recomendado):
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+1. `notebooks/hogares_mercado_laboral.ipynb`
+2. `notebooks/individuos_mercado_laboral.ipynb` (al final pide años y
+   aglomerados por teclado; si no se escribe nada se usan valores por defecto)
+3. `notebooks/ciencia_tecnologia.ipynb`
 
-***
+## Estructura del proyecto
 
-# Editing this README
+```
+proyecto_taller/
+├── src/
+│   ├── config.py        <- todos los criterios que pueden cambiar
+│   ├── rutas.py         <- raíz del proyecto
+│   ├── data_loader.py   <- leer, detectar y filtrar archivos; guardar JSON
+│   ├── profiling.py     <- completitud (A.1), consistencia (A.2, A.3) y roles
+│   ├── tendencias.py    <- tendencias por aglomerado (B.1)
+│   └── tecnologia.py    <- consistencia y penetración tecnológica (C)
+├── notebooks/           <- los tres notebooks
+├── output/              <- informes JSON generados
+├── bitacora.md          <- decisiones, problemas y consultas
+├── requirements.txt
+├── LICENSE
+└── README.md
+```
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+## Cómo cambiar los criterios de análisis
 
-## Suggestions for a good README
+Todo se configura en `src/config.py`, sin tocar las funciones:
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+| Quiero cambiar | Constante |
+|---|---|
+| Carpeta de los datos | `DIR_DATOS` |
+| Umbrales de faltantes | `UMBRALES_FALTANTES_PCT` |
+| Variables analizadas | `VARS_INDIVIDUOS_*`, `VARS_HOGARES_*` |
+| Qué cuenta como faltante | `FALTANTES_REALES`, `NO_CORRESPONDE` |
+| Edades de las reglas | `EDAD_MIN_ERROR`, `EDAD_MAX_ERROR`, `EDAD_MIN_VERIFICAR`, `EDAD_LEGAL_TRABAJO`, `EDAD_MIN_UNIVERSITARIO`, `EDAD_MIN_JUBILACION_POR_SEXO` |
+| Roles | `ROLES` |
+| Rangos etarios y semestres | `RANGOS_ETARIOS`, `SEMESTRES` |
+| Qué hacer si el informe de tecnología ya existe | `MODO_ARCHIVO_EXISTENTE` |
 
-## Name
-Choose a self-explaining name for your project.
+## Estilo
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+El código sigue PEP 8 y todas las funciones tienen docstrings:
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+```bash
+python -m pycodestyle src
+```
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+## Estado
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+- Primera etapa: implementada (partes A, B y C). 
+- Aplicación Streamlit y análisis con pandas: segunda etapa.
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+## Licencia
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+MIT (ver `LICENSE`).
