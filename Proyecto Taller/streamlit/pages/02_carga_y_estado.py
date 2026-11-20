@@ -1,5 +1,4 @@
 import streamlit as st
-
 from src import config
 from src.panel_calidad import (
     cargar_todos_los_informes,
