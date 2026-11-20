@@ -181,7 +181,7 @@ def filtrar_mercado_laboral(datos, anio_desde=None, anio_hasta=None,
         mascara &= datos["TRIMESTRE"].isin(list(trimestres))
     return datos[mascara].copy()
 
-   
+
 # Este es el grupo de columnas que se usa por defecto para los cálculos
 GRUPO_TRIMESTRAL = ["ANO4", "TRIMESTRE", config.COL_AGLOMERADO]
 
@@ -278,16 +278,17 @@ def calcular_tasa_desempleo(datos, agrupar_por=None):
 
 
 # =============================================================================
-# PASO 4: INDICADORES POR SEXO Y BRECHAS DE GÉNERO
+# INDICADORES POR SEXO Y BRECHAS DE GÉNERO
 # =============================================================================
 # Sufijo que lleva cada sexo en los nombres de columna (sin tildes).
+
 SUFIJO_SEXO = {
     config.NOMBRES_SEXO[config.SEXO_VARON]: "varon",
     config.NOMBRES_SEXO[config.SEXO_MUJER]: "mujer",
 }
 # Indicadores sobre los que se calcula la brecha de género.
 METRICAS_BRECHA = ["tasa_desempleo", "pct_ocupados", "pct_inactivos"]
-# Nombre del grupo que incluye a ambos sexos.
+# Nombre que se usa para el total de ambos sexos en la columna 'sexo'
 TOTAL_SEXO = "Total"
 
 
@@ -400,6 +401,23 @@ def _grupo_del_periodo(periodo):
     return list(GRUPOS_POR_PERIODO[periodo])
 
 
+def _etiqueta_periodo(tabla, periodo):
+    """Arma la etiqueta de período de cada fila.
+
+    Args:
+        tabla: DataFrame con ANO4 y, si es trimestral, TRIMESTRE.
+        periodo: 'trimestral' o 'anual'.
+
+    Returns:
+        Serie de texto, por ejemplo '2024-T1' (trimestral) o '2024'
+        (anual).
+    """
+    etiqueta = tabla["ANO4"].astype(str)
+    if periodo == "trimestral":
+        etiqueta = etiqueta + "-T" + tabla["TRIMESTRE"].astype(str)
+    return etiqueta
+
+
 def _agregar_etiquetas(tabla, periodo):
     """Agrega el nombre del aglomerado y la etiqueta del período.
 
@@ -416,10 +434,9 @@ def _agregar_etiquetas(tabla, periodo):
     codigos = tabla[config.COL_AGLOMERADO]
     tabla["aglomerado_nombre"] = codigos.map(config.AGLOMERADOS).fillna(
         codigos)
-    tabla["periodo"] = tabla["ANO4"].astype(str)
+    tabla["periodo"] = _etiqueta_periodo(tabla, periodo)
     orden = ["ANO4"]
     if periodo == "trimestral":
-        tabla["periodo"] += "-T" + tabla["TRIMESTRE"].astype(str)
         orden.append("TRIMESTRE")
     orden.append("aglomerado_nombre")
     if "sexo" in tabla.columns:
@@ -428,7 +445,8 @@ def _agregar_etiquetas(tabla, periodo):
 
 
 def preparar_datos_evolucion(datos, anio_desde, anio_hasta,
-                             aglomerados=None, periodo="trimestral"):
+                             aglomerados=None, periodo="trimestral",
+                             trimestres=None):
     """Prepara la tabla para graficar la evolución y las brechas.
 
     Valida el rango de años, filtra y calcula los indicadores del total y
@@ -440,6 +458,8 @@ def preparar_datos_evolucion(datos, anio_desde, anio_hasta,
         anio_hasta: último año (incluido).
         aglomerados: lista de códigos de aglomerado (None = todos).
         periodo: 'trimestral' o 'anual'.
+        trimestres: lista de trimestres a incluir (None = todos). Permite
+            comparar el mismo trimestre en varios años.
 
     Returns:
         DataFrame en formato largo con una fila por período, aglomerado y
@@ -455,7 +475,7 @@ def preparar_datos_evolucion(datos, anio_desde, anio_hasta,
     validar_rango_anios(datos, anio_desde, anio_hasta)
     agrupar_por = _grupo_del_periodo(periodo)
     filtrados = filtrar_mercado_laboral(
-        datos, anio_desde, anio_hasta, aglomerados)
+        datos, anio_desde, anio_hasta, aglomerados, trimestres)
     total = _indicadores(filtrados, agrupar_por)
     total["sexo"] = TOTAL_SEXO
     por_sexo = calcular_indicadores_genero(filtrados, agrupar_por)
@@ -486,3 +506,212 @@ def preparar_datos_mapa(datos, periodo="trimestral"):
         calcular_indicadores_genero(datos, agrupar_por), agrupar_por)
     tabla = total.merge(brechas, on=agrupar_por, how="left")
     return _agregar_etiquetas(tabla, periodo)
+
+
+# =============================================================================
+# PASO 6: APOYO A LA PÁGINA P3 (resúmenes, descripción y formatos)
+# =============================================================================
+# Indicadores que el usuario puede elegir para graficar.
+METRICAS_EVOLUCION = {
+    "Tasa de desempleo (%)": "tasa_desempleo",
+    "Población ocupada (% de la población)": "pct_ocupados",
+    "Población inactiva (% de la población)": "pct_inactivos",
+}
+
+
+def formatear_numero(valor, con_signo=False):
+    """Da formato a un número: dos decimales y coma decimal (7,61).
+
+    Args:
+        valor: número a formatear.
+        con_signo: si es True agrega el signo + a los positivos.
+
+    Returns:
+        Texto con el número, o 's/d' si el valor no está disponible.
+    """
+    if valor != valor:
+        return "s/d"
+    formato = "+.2f" if con_signo else ".2f"
+    return format(valor, formato).replace(".", ",")
+
+
+def preparar_datos_distribucion(tabla, sexo=TOTAL_SEXO):
+    """Pasa la distribución de la población a formato largo para graficar.
+
+    Args:
+        tabla: resultado de preparar_datos_evolucion.
+        sexo: 'Total', 'Varón' o 'Mujer'.
+
+    Returns:
+        DataFrame con una fila por período, aglomerado y estado, con las
+        columnas 'estado' (Ocupados, Desocupados, Inactivos) y
+        'porcentaje' (% de la población).
+    """
+    columnas = ["pct_" + config.NOMBRES_ESTADO[e]
+                for e in config.ESTADOS_DISTRIBUCION]
+    identificadores = [c for c in ("ANO4", "TRIMESTRE", "AGLOMERADO",
+                                   "aglomerado_nombre", "periodo")
+                       if c in tabla.columns]
+    largo = tabla[tabla["sexo"] == sexo].melt(
+        id_vars=identificadores, value_vars=columnas,
+        var_name="estado", value_name="porcentaje")
+    largo["estado"] = (largo["estado"].str.replace("pct_", "", regex=False)
+                       .str.capitalize())
+    return largo
+
+
+def preparar_datos_brechas(tabla, periodo):
+    """Calcula las brechas de género a partir de la tabla de evolución.
+
+    Args:
+        tabla: resultado de preparar_datos_evolucion.
+        periodo: 'trimestral' o 'anual' (el mismo con que se armó tabla).
+
+    Returns:
+        DataFrame con una fila por período y aglomerado, con las columnas
+        de calcular_brechas_genero más 'aglomerado_nombre' y 'periodo'.
+    """
+    por_sexo = tabla[tabla["sexo"] != TOTAL_SEXO]
+    brechas = calcular_brechas_genero(
+        por_sexo, _grupo_del_periodo(periodo))
+    return _agregar_etiquetas(brechas, periodo)
+
+
+def resumir_seleccion(tabla, periodo):
+    """Resume los aglomerados elegidos como si fueran un único conjunto.
+
+    Suma la población ponderada de todos los aglomerados de la tabla
+    (por período y sexo) y recalcula tasa y porcentajes sobre esa suma.
+
+    Args:
+        tabla: resultado de preparar_datos_evolucion.
+        periodo: 'trimestral' o 'anual'.
+
+    Returns:
+        DataFrame con una fila por período y sexo, ordenado por período,
+        con ocupados, desocupados, inactivos, poblacion, pea,
+        tasa_desempleo, los pct_* y 'periodo'.
+    """
+    agrupar_por = [c for c in _grupo_del_periodo(periodo)
+                   if c != config.COL_AGLOMERADO] + ["sexo"]
+    nombres = [config.NOMBRES_ESTADO[e] for e in config.ESTADOS_DISTRIBUCION]
+    resumen = tabla.groupby(agrupar_por)[nombres].sum().reset_index()
+    resumen["poblacion"] = resumen[nombres].sum(axis=1)
+    resumen["pea"] = resumen[[config.NOMBRES_ESTADO[e]
+                              for e in config.ESTADOS_ACTIVOS]].sum(axis=1)
+    desocupados = config.NOMBRES_ESTADO[config.ESTADO_DESOCUPADO]
+    resumen["tasa_desempleo"] = (
+        100 * resumen[desocupados] / resumen["pea"].where(resumen["pea"] > 0))
+    for nombre in nombres:
+        resumen["pct_" + nombre] = (
+            100 * resumen[nombre] / resumen["poblacion"].where(
+                resumen["poblacion"] > 0))
+    resumen["periodo"] = _etiqueta_periodo(resumen, periodo)
+    orden = [c for c in ("ANO4", "TRIMESTRE") if c in resumen.columns]
+    return resumen.sort_values(orden + ["sexo"]).reset_index(drop=True)
+
+
+def indicadores_principales(tabla, periodo):
+    """Calcula los indicadores destacados del último período.
+
+    Args:
+        tabla: resultado de preparar_datos_evolucion.
+        periodo: 'trimestral' o 'anual'.
+
+    Returns:
+        Diccionario con 'periodo' (el último), 'periodo_inicial',
+        'tasa_total', 'tasa_varon', 'tasa_mujer' (tasas de desempleo del
+        conjunto de aglomerados en el último período), 'brecha' (mujer -
+        varón, en puntos porcentuales) y 'variacion_total' (cambio de la
+        tasa total entre el primer y el último período). Los valores que
+        no se pueden calcular son NaN.
+    """
+    resumen = resumir_seleccion(tabla, periodo)
+    periodos = resumen["periodo"].unique().tolist()
+    primero, ultimo = periodos[0], periodos[-1]
+
+    def tasa(etiqueta, sexo):
+        fila = resumen[(resumen["periodo"] == etiqueta)
+                       & (resumen["sexo"] == sexo)]
+        return float(fila["tasa_desempleo"].iloc[0]) if len(fila) \
+            else float("nan")
+
+    varon = config.NOMBRES_SEXO[config.SEXO_VARON]
+    mujer = config.NOMBRES_SEXO[config.SEXO_MUJER]
+    total_ultimo = tasa(ultimo, TOTAL_SEXO)
+    return {
+        "periodo": ultimo,
+        "periodo_inicial": primero,
+        "tasa_total": total_ultimo,
+        "tasa_varon": tasa(ultimo, varon),
+        "tasa_mujer": tasa(ultimo, mujer),
+        "brecha": tasa(ultimo, mujer) - tasa(ultimo, varon),
+        "variacion_total": total_ultimo - tasa(primero, TOTAL_SEXO),
+    }
+
+
+def generar_descripcion(tabla, periodo, umbral_estable=0.05):
+    """Redacta la descripción de los resultados según la selección.
+
+    El texto se arma con los números de la tabla, así que cambia cuando
+    el usuario modifica los filtros.
+
+    Args:
+        tabla: resultado de preparar_datos_evolucion.
+        periodo: 'trimestral' o 'anual'.
+        umbral_estable: variación (en puntos porcentuales) por debajo de
+            la cual se dice que la tasa se mantuvo estable.
+
+    Returns:
+        Lista de oraciones (texto).
+    """
+    if tabla.empty:
+        return ["No hay datos para la selección elegida."]
+    datos = indicadores_principales(tabla, periodo)
+    ultimo, primero = datos["periodo"], datos["periodo_inicial"]
+    nombres = sorted(tabla["aglomerado_nombre"].unique())
+    if len(nombres) <= 3:
+        zona = ", ".join(nombres)
+    else:
+        zona = f"{len(nombres)} aglomerados"
+    frases = [f"Considerando {zona}, la tasa de desempleo fue de "
+              f"{formatear_numero(datos['tasa_total'])} % en {ultimo}."]
+
+    variacion = datos["variacion_total"]
+    if primero != ultimo and variacion == variacion:
+        if abs(variacion) < umbral_estable:
+            movimiento = "se mantuvo prácticamente estable"
+        elif variacion > 0:
+            movimiento = (
+                f"subió {formatear_numero(variacion)} puntos porcentuales")
+        else:
+            movimiento = (
+                f"bajó {formatear_numero(abs(variacion))} puntos porcentuales")
+        frases.append(f"Respecto de {primero}, la tasa {movimiento}.")
+
+    en_ultimo = tabla[(tabla["periodo"] == ultimo)
+                      & (tabla["sexo"] == TOTAL_SEXO)]
+    if len(en_ultimo) > 1:
+        mayor = en_ultimo.loc[en_ultimo["tasa_desempleo"].idxmax()]
+        menor = en_ultimo.loc[en_ultimo["tasa_desempleo"].idxmin()]
+        frases.append(
+            f"En {ultimo}, el mayor desempleo se dio en "
+            f"{mayor['aglomerado_nombre']} "
+            f"({formatear_numero(mayor['tasa_desempleo'])} %) y el menor en "
+            f"{menor['aglomerado_nombre']} "
+            f"({formatear_numero(menor['tasa_desempleo'])} %).")
+
+    brecha = datos["brecha"]
+    if brecha == brecha:
+        if abs(brecha) < umbral_estable:
+            frases.append(
+                "Las tasas de mujeres y varones son prácticamente iguales.")
+        else:
+            quien = "mayor" if brecha > 0 else "menor"
+            mujeres = formatear_numero(datos["tasa_mujer"])
+            varones = formatear_numero(datos["tasa_varon"])
+            frases.append(
+                f"La tasa de las mujeres ({mujeres} %) es {quien} que la de "
+                f"los varones ({varones} %): una brecha de "
+                f"{formatear_numero(abs(brecha))} puntos porcentuales.")
+    return frases
