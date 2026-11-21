@@ -13,7 +13,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 if str(RAIZ) not in sys.path:
     sys.path.append(str(RAIZ))
 
-from src import config, data_loader, hogares_tecnología as ht  # noqa: E402
+from src import config, data_loader, hogares_tecnologia as ht  # noqa: E402
 
 
 @st.cache_data(show_spinner="Leyendo el informe de tecnología...")
