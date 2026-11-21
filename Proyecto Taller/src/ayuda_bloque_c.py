@@ -4,31 +4,21 @@ Cada ejemplo es una función corta que trabaja con los datos reales de hogares.
 La hoja de ayuda muestra el código de la función (con inspect) y su resultado,
 así que lo que se ve en pantalla es exactamente lo que se ejecuta.
 """
-import inspect
-from typing import Callable, NamedTuple
-
-import numpy as np
 import pandas as pd
 
 from src import config
 from src import hogares_tecnologia as ht
+from src.ayuda_comun import (
+    Ejemplo, TEMA_AGREGACIONES, TEMA_GRAFICO, TEMA_MERGE, tablas_iguales)
 
-
-class Ejemplo(NamedTuple):
-    """Un ejemplo de la hoja de ayuda.
-
-    Attributes:
-        titulo: nombre corto del ejemplo.
-        explicacion: qué muestra y por qué se usó así en el proyecto.
-        funcion: función que calcula el resultado.
-        entradas: nombres de los datos que recibe, en orden (claves de
-            lo que devuelve preparar_datos).
-    """
-
-    titulo: str
-    explicacion: str
-    funcion: Callable
-    entradas: tuple
+RESUMEN = (
+    "**Lo que usa el módulo `hogares_tecnologia.py`:** `groupby().agg()` "
+    "con `unstack` para tener, por grupo de vivienda y calidad "
+    "tecnológica, los hogares ponderados y la muestra; y un `merge` con "
+    "`how='left'` y `validate='one_to_one'` para cruzar los hogares TIC "
+    "con los de vivienda por la tupla (CODUSU, NRO_HOGAR, AGLOMERADO). "
+    "`pivot_table` se compara en el ejemplo 6."
+)
 
 
 def ejemplo_sum(hogares):
@@ -93,18 +83,21 @@ def ejemplo_pivot_table(hogares):
 
 EJEMPLOS = (
     Ejemplo(
+        TEMA_AGREGACIONES,
         "1. Suma simple con groupby().sum()",
         "Una sola agregación: cuántos hogares representa cada región "
         "(suma del peso POND_TIC). Es lo más corto, pero solo da un número "
         "por grupo.",
         ejemplo_sum, ("hogares",)),
     Ejemplo(
+        TEMA_AGREGACIONES,
         "2. Varias agregaciones con groupby().agg()",
         "Con agg() se calculan en una pasada la muestra, los hogares "
         "ponderados y el peso promedio, cada uno con su nombre de columna. "
         "Se usó en el análisis para mostrar la muestra junto al porcentaje.",
         ejemplo_agg, ("hogares",)),
     Ejemplo(
+        TEMA_MERGE,
         "3. merge entre los hogares TIC y los de Mercado Laboral",
         "Cruce por (CODUSU, NRO_HOGAR, AGLOMERADO). Antes se quitan las "
         "claves repetidas. how='left' conserva todos los hogares TIC, "
@@ -112,17 +105,20 @@ EJEMPLOS = (
         "indicator=True permite contar cuáles tuvieron pareja.",
         ejemplo_merge_hogares, ("hogares_tic", "hogares_vivienda")),
     Ejemplo(
+        TEMA_MERGE,
         "4. merge con una tabla de nombres",
         "Se agrega el nombre de la región uniendo con una tabla chica "
         "creada desde config.NOMBRES_REGIONES.",
         ejemplo_merge_regiones, ("hogares",)),
     Ejemplo(
+        TEMA_GRAFICO,
         "5. Estructura del gráfico con groupby() + unstack()",
         "groupby agrupa por tipo de vivienda y calidad tecnológica; unstack "
         "pasa la calidad a columnas. Cada fila se divide por su total, así "
         "suma 100. Es la estrategia elegida para el gráfico.",
         ejemplo_groupby_unstack, ("hogares",)),
     Ejemplo(
+        TEMA_GRAFICO,
         "6. Lo mismo con pivot_table()",
         "Da los mismos porcentajes en menos líneas. No se eligió porque "
         "con groupby + unstack es más fácil forzar las 4 categorías aunque "
@@ -152,41 +148,15 @@ def preparar_datos(anio):
             "hogares": validos}
 
 
-def ejecutar(ejemplo, datos):
-    """Ejecuta un ejemplo con los datos preparados.
-
-    Args:
-        ejemplo: un elemento de EJEMPLOS.
-        datos: resultado de preparar_datos.
-
-    Returns:
-        El DataFrame que devuelve la función del ejemplo.
-    """
-    return ejemplo.funcion(*[datos[nombre] for nombre in ejemplo.entradas])
-
-
-def codigo_fuente(ejemplo):
-    """Devuelve el código de la función de un ejemplo, para mostrarlo.
-
-    Args:
-        ejemplo: un elemento de EJEMPLOS.
-
-    Returns:
-        El texto del código fuente.
-    """
-    return inspect.getsource(ejemplo.funcion)
-
-
-def son_equivalentes(hogares):
+def son_equivalentes(datos):
     """Comprueba que groupby + unstack y pivot_table dan lo mismo.
 
     Args:
-        hogares: hogares preparados (resultado de preparar_datos).
+        datos: resultado de preparar_datos.
 
     Returns:
         True si los porcentajes coinciden (tolerancia de redondeo).
     """
-    a = ejemplo_groupby_unstack(hogares).sort_index(axis=1)
-    b = ejemplo_pivot_table(hogares).sort_index(axis=1)
-    return bool(a.index.equals(b.index)
-                and np.allclose(a.to_numpy(), b.to_numpy(), atol=0.11))
+    hogares = datos["hogares"]
+    return tablas_iguales(ejemplo_groupby_unstack(hogares),
+                          ejemplo_pivot_table(hogares))
