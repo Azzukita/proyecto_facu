@@ -9,17 +9,16 @@ provincia de cada aglomerado, siguiendo la clasificación regional de la EPH
 import pandas as pd
 
 
-
 # Región y provincia por código de aglomerado EPH.
 # Formato: "código": (región, provincia)
-# Nota: en la EPH, "Buenos Aires" como región incluye solo CABA y los
+# Nota: en la EPH, "Gran Buenos Aires" como región incluye solo CABA y los
 # Partidos del GBA; el resto de los aglomerados bonaerenses va en "Pampeana".
 
 
 REGION_PROVINCIA = {
-    # Buenos Aires
-    "32": ("Buenos Aires", "CABA"),
-    "33": ("Buenos Aires", "Buenos Aires"),
+    # Gran Buenos Aires
+    "32": ("Gran Buenos Aires", "CABA"),
+    "33": ("Gran Buenos Aires", "Buenos Aires"),
     # Noroeste
     "18": ("Noroeste", "Santiago del Estero"),
     "19": ("Noroeste", "Jujuy"),
@@ -57,10 +56,27 @@ REGION_PROVINCIA = {
     "93": ("Patagonia", "Río Negro"),
 }
 
-def cargar_aglomerados(ruta) -> pd.DataFrame:
-    """Construye un DataFrame de aglomerados EPH con región, provincia y coordenadas.
 
-    Lee el archivo JSON de aglomerados (donde cada clave es el código EPH y cada
+def normalizar_codigo(codigo):
+    """Devuelve el código de aglomerado con dos dígitos ('2' -> '02').
+
+    Los resultados de los bloques B y C traen el código sin cero a la
+    izquierda y el JSON de coordenadas lo trae con cero; esta función deja
+    ambos en el mismo formato para poder unirlos.
+
+    Args:
+        codigo: código de aglomerado (texto o número).
+
+    Returns:
+        Texto de dos dígitos.
+    """
+    return str(codigo).strip().zfill(2)
+
+
+def cargar_aglomerados(ruta) -> pd.DataFrame:
+    """Construye el DataFrame de aglomerados EPH para el mapa.
+
+    Lee el archivo JSON de aglomerados (cada clave es el código EPH y cada
     valor contiene ``nombre`` y ``coordenadas`` como ``[lat, lon]``), le asocia
     su región y provincia según ``REGION_PROVINCIA`` y devuelve el resultado
     ordenado por región y nombre de aglomerado.
@@ -73,13 +89,20 @@ def cargar_aglomerados(ruta) -> pd.DataFrame:
         ``provincia``, ``lat`` y ``lon``, ordenado por ``region`` y
         ``aglomerado`` con índice reiniciado.
     """
-    df = pd.read_json(ruta, orient="index", encoding="utf-8", dtype={"index": str})
-    df.index = df.index.astype(str).str.zfill(2)    #evita que pd.read_json reinterprete 
-                                                    #el "02","03 etc a "2","3"
+    df = pd.read_json(
+        ruta,
+        orient="index",
+        encoding="utf-8",
+        dtype={
+            "index": str})
+    df.index = df.index.astype(str).str.zfill(
+        2)  # evita que pd.read_json reinterprete
+    # el "02","03 etc a "2","3"
     df.index.name = "codigo"
     df = df.reset_index()
 
-    df[["lat", "lon"]] = pd.DataFrame(df["coordenadas"].tolist(), index=df.index)
+    df[["lat", "lon"]] = pd.DataFrame(
+        df["coordenadas"].tolist(), index=df.index)
     df[["region", "provincia"]] = pd.DataFrame(
         df["codigo"].map(REGION_PROVINCIA).tolist(), index=df.index
     )
@@ -89,4 +112,3 @@ def cargar_aglomerados(ruta) -> pd.DataFrame:
         df.rename(columns={"nombre": "aglomerado"})[columnas]
         .sort_values(["region", "aglomerado"], ignore_index=True)
     )
-
