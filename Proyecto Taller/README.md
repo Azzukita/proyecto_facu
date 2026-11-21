@@ -135,3 +135,20 @@ python -m pycodestyle src
 ## Licencia
 
 MIT (ver `LICENSE`).
+
+*----------------------------------------------*
+
+# PyEPH.AR pt2
+
+
+# Cómo se ejecuta
+  
+  Abrir un Bash dentro de la carpeta streamlit y ejecutar el siguiente comando:
+  **streamlit run streamlit/app.py**
+
+  una vez abierto, y si se es necesario, seguir el tutorial presente en la página de inicio.
+
+# descripción breve del proyecto
+
+  Este proyecto es la continuación de la entrega pasada. Se busca mostrar la información de
+  los datos ya analizados, con gráficos, métricas y mapas, denrto de un entorno interactivo.
