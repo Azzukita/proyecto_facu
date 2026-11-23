@@ -142,11 +142,19 @@ MIT (ver `LICENSE`).
 
 
 # Cómo se ejecuta
-  
-  Abrir un Bash dentro de la carpeta streamlit y ejecutar el siguiente comando:
-  **streamlit run streamlit/app.py**
 
-  una vez abierto, y si se es necesario, seguir el tutorial presente en la página de inicio.
+1. Instalar las dependencias (ver "Instalación" más arriba).
+2. Verificar que la carpeta `files` con los datos de la EPH esté **al lado**
+   de la carpeta del proyecto (ver "Dónde van los datos").
+3. Abrir una terminal **en la carpeta raíz del proyecto** (la que contiene
+   `src/`, `streamlit/` y `README.md`) y ejecutar:
+
+bash
+streamlit run streamlit/app.py
+
+
+4. Se abre el navegador en `http://localhost:8501`. Si hace falta, seguir el
+   tutorial de la página de inicio.
 
 # descripción breve del proyecto
 
